@@ -8,6 +8,9 @@ public record CommandeResponse(
         String email,
         String produit,
         int quantite,
+        String typeClient,
+        double montant,
+        String numeroSuivi,
         String statut,
         String processInstanceId) {
 
@@ -18,6 +21,9 @@ public record CommandeResponse(
                 commande.getEmail(),
                 commande.getProduit(),
                 commande.getQuantite(),
+                commande.getTypeClient(),
+                commande.getMontant(),
+                commande.getNumeroSuivi(),
                 commande.getStatut().name(),
                 commande.getProcessInstanceId());
     }

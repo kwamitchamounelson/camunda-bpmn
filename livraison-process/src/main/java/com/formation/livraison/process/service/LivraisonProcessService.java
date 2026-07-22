@@ -29,14 +29,15 @@ public class LivraisonProcessService {
         this.commandeService = commandeService;
     }
 
-    public ProcessInstance demarrer(String client, String email, String produit, int quantite) {
-        Commande commande = commandeService.creer(client, email, produit, quantite);
+    public ProcessInstance demarrer(String client, String email, String produit, int quantite, String typeClient) {
+        Commande commande = commandeService.creer(client, email, produit, quantite, typeClient);
 
         Map<String, Object> variables = Variables.createVariables()
                 .putValue(ProcessVariables.COMMANDE_ID, commande.getId())
                 .putValue(ProcessVariables.CLIENT, client)
                 .putValue(ProcessVariables.PRODUIT, produit)
-                .putValue(ProcessVariables.QUANTITE, quantite);
+                .putValue(ProcessVariables.QUANTITE, quantite)
+                .putValue(ProcessVariables.TYPE_CLIENT, commande.getTypeClient());
 
         // La businessKey rend l'instance identifiable dans Cockpit par l'id de commande.
         ProcessInstance instance = runtimeService.startProcessInstanceByKey(

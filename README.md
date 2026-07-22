@@ -9,7 +9,7 @@ Projet Maven multi-modules, **une seule application déployée** (moteur Camunda
 | Module | Contenu | Dépend de Camunda ? |
 |---|---|---|
 | `livraison-domain` | `Commande`, `StockService`, `PricingService`, `EmailService`, `CommandeService` | **Non** |
-| `livraison-process` | Application Spring Boot, moteur + webapps, `JavaDelegate`, API REST | Oui |
+| `livraison-process` | Application Spring Boot, moteur + webapps, `JavaDelegate`, table DMN, API REST | Oui |
 
 Le module métier ignore totalement qu'il est orchestré. C'est ce qui te permettra plus tard de
 passer en *External Task* (worker séparé) ou vers Camunda 8 sans réécrire la logique métier.
@@ -59,6 +59,26 @@ Ce que le modèle illustre :
 | Événement frontière non interruptif (timer) | Rappel manager après 2 min |
 | Boucle | Rupture → réappro → attente → re-vérification |
 | Formulaire de tâche | Champs `approuve` / `motifRefus` sur la validation |
+| **Décision DMN** (business rule task) | « Qui doit valider ? » selon type client + montant |
+
+### La décision DMN
+
+Le niveau de validation n'est plus codé en dur : il est produit par une **table de décision**
+`dmn/niveauValidation.dmn`, appelée par la business rule task *Déterminer le niveau de validation*.
+Elle prend en entrée `typeClient` et `montant`, et renvoie la variable `validateur` :
+
+| # | Type client | Montant | → validateur |
+|---|---|---|---|
+| 1 | VIP | < 10 000 € | `aucun` |
+| 2 | VIP | ≥ 10 000 € | `directeurs` |
+| 3 | (tout) | < 1 000 € | `aucun` |
+| 4 | (tout) | 1 000–5 000 € | `managers` |
+| 5 | (tout) | ≥ 5 000 € | `directeurs` |
+
+Hit policy **FIRST** : la première ligne qui matche gagne (d'où la priorité VIP sur les règles standard).
+Le résultat pilote ensuite deux choses : la passerelle *Validation requise ?* (`${validateur == "aucun"}`)
+et le groupe destinataire de la tâche, assigné dynamiquement via `camunda:candidateGroups="${validateur}"`.
+Ouvre le `.dmn` dans Camunda Modeler pour éditer la table visuellement.
 
 ## Câblage BPMN → Java
 
@@ -69,7 +89,8 @@ Le nom du bean Spring doit correspondre **exactement** à la `delegateExpression
 | `Task_VerifStock` | `#{verifierDisponibilite}` | `VerifierDisponibiliteDelegate` (écrit `disponible`) |
 | `Task_Reappro` | `#{lancerReapprovisionnement}` | `LancerReapprovisionnementDelegate` |
 | `Task_Montant` | `#{calculerMontant}` | `CalculerMontantDelegate` (écrit `montant`) |
-| `Task_Validation` | user task, groupe `managers` | — (écrit `approuve`, `motifRefus`) |
+| `Task_Niveau` | business rule task `decisionRef=niveauValidation` | table DMN (écrit `validateur`) |
+| `Task_Validation` | user task, groupe `${validateur}` | — (écrit `approuve`, `motifRefus`) |
 | `Task_Annuler` | `#{annulerCommande}` | `AnnulerCommandeDelegate` |
 | `Task_Rappel` | `#{envoyerRappel}` | `EnvoyerRappelDelegate` |
 | `Task_Prepa` | user task, groupe `logistique` | — |
@@ -78,13 +99,15 @@ Le nom du bean Spring doit correspondre **exactement** à la `delegateExpression
 | `Task_Complete` | `#{completeOrder}` | `CompleteOrderDelegate` |
 
 Les décisions des passerelles reposent sur ces variables de processus :
-`${disponible}`, `${montant > 1000}`, `${approuve}`.
+`${disponible}`, `${validateur == "aucun"}`, `${approuve}`.
 
-## Fichier BPMN
+## Fichiers de modèle
 
-Source unique : `livraison-process/src/main/resources/bpmn/processus_livraison.bpmn`.
-C'est ce fichier qu'il faut éditer (ouvre-le dans Camunda Modeler) ; tout `.bpmn` de ce dossier
-est déployé au démarrage.
+- BPMN : `livraison-process/src/main/resources/bpmn/processus_livraison.bpmn`
+- DMN : `livraison-process/src/main/resources/dmn/niveauValidation.dmn`
+
+Édite-les dans Camunda Modeler. Tout `.bpmn` du dossier `bpmn/` et tout `.dmn` du dossier `dmn/`
+sont déployés au démarrage.
 
 `camunda:historyTimeToLive="P180D"` est présent sur le process : **obligatoire depuis Camunda 7.20**,
 sans lui le déploiement échoue au démarrage.
@@ -101,12 +124,13 @@ mvn -pl livraison-process spring-boot:run
 | Quoi | URL | Identifiants |
 |---|---|---|
 | Cockpit / Tasklist / Admin | http://localhost:8080/camunda/app/welcome/ | `demo` / `demo` |
-| Manager (valide les commandes) | idem | `manager` / `demo` |
+| Manager (valide 1 000–5 000 €) | idem | `manager` / `demo` |
+| Directeur (valide ≥ 5 000 €) | idem | `directeur` / `demo` |
 | Employé logistique (prépare) | idem | `employeLogistique` / `demo` |
 | API REST Camunda | http://localhost:8080/engine-rest/engine | — |
 | API métier | http://localhost:8080/api/commandes | — |
 
-Les comptes et groupes (`managers`, `logistique`) sont créés au démarrage par `IdentityBootstrap`.
+Les comptes et groupes (`managers`, `directeurs`, `logistique`) sont créés au démarrage par `IdentityBootstrap`.
 
 ## Catalogue de démonstration
 
@@ -117,11 +141,12 @@ Les comptes et groupes (`managers`, `logistique`) sont créés au démarrage par
 | ecran | 3 | 250 € |
 | casque | 0 | 80 € |
 
-## Trois scénarios à dérouler
+## Scénarios à dérouler
 
 Chaque appel démarre une instance ; observe-la ensuite dans **Cockpit → Processes → Processus de livraison**.
+Le champ `typeClient` (`STANDARD` par défaut, ou `VIP`) pilote la décision DMN.
 
-**1. Cas nominal (ni validation, ni rupture)** — clavier x2 = 90 € :
+**1. Cas nominal (DMN → `aucun`)** — clavier x2 = 90 € :
 
 ```powershell
 curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: application/json" -d "{\"client\":\"Alice\",\"email\":\"alice@exemple.fr\",\"produit\":\"clavier\",\"quantite\":2}"
@@ -130,21 +155,39 @@ curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: applicati
 Le jeton s'arrête sur **Préparer la commande**. Connecte-toi en `employeLogistique`, complète la tâche
 depuis la Tasklist : les branches Email + Expédition s'exécutent en parallèle, puis l'instance se termine.
 
-**2. Validation manager** — clavier x25 = 1125 € (> 1000 €) :
+**2. Validation manager (DMN → `managers`)** — clavier x25 = 1125 € :
 
 ```powershell
 curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: application/json" -d "{\"client\":\"Bob\",\"email\":\"bob@exemple.fr\",\"produit\":\"clavier\",\"quantite\":25}"
 ```
 
-Le jeton s'arrête sur **Valider la commande**. Connecte-toi en `manager` : le formulaire propose
-`approuve` (booléen) et `motifRefus`. Si tu ne complètes pas dans les 2 minutes, un rappel part
-(événement frontière non interruptif — visible dans les logs, la tâche reste ouverte).
-Approuvée → préparation ; refusée → **Commande refusée**.
+Le jeton s'arrête sur **Valider la commande**, offerte au groupe `managers`. Connecte-toi en `manager` :
+le formulaire propose `approuve` et `motifRefus`. Sans réponse en 2 minutes, un rappel part (événement
+frontière non interruptif, la tâche reste ouverte). Approuvée → préparation ; refusée → **Commande refusée**.
 
-**3. Rupture de stock + réapprovisionnement** — casque (stock 0) :
+**3. Validation directeur (DMN → `directeurs`)** — ecran x25 = 6250 € :
 
 ```powershell
-curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: application/json" -d "{\"client\":\"David\",\"email\":\"david@exemple.fr\",\"produit\":\"casque\",\"quantite\":1}"
+curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: application/json" -d "{\"client\":\"Carla\",\"email\":\"carla@exemple.fr\",\"produit\":\"ecran\",\"quantite\":25}"
+```
+
+Ecran étant en rupture (stock 3), le process passe d'abord par le réappro, puis la même commande à
+6250 € route la validation vers le groupe `directeurs` (connecte-toi en `directeur`). Un seul parcours
+cumule ainsi rupture + réappro + décision DMN.
+
+**4. Client VIP (DMN → `aucun` malgré le montant)** — clavier x25 = 1125 €, mais VIP :
+
+```powershell
+curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: application/json" -d "{\"client\":\"Vera\",\"email\":\"vera@exemple.fr\",\"produit\":\"clavier\",\"quantite\":25,\"typeClient\":\"VIP\"}"
+```
+
+Même montant que le scénario 2, mais la règle VIP de la table DMN saute la validation : le jeton va
+directement à la préparation. C'est l'illustration directe de l'intérêt du DMN.
+
+**5. Rupture de stock + réapprovisionnement** — casque (stock 0) :
+
+```powershell
+curl.exe -X POST http://localhost:8080/api/commandes -H "Content-Type: application/json" -d "{\"client\":\"Eric\",\"email\":\"eric@exemple.fr\",\"produit\":\"casque\",\"quantite\":1}"
 ```
 
 Le jeton part sur **Lancer réapprovisionnement** puis attend 30 s sur le timer. Dans Cockpit tu vois
@@ -164,13 +207,13 @@ Pour repartir de zéro, supprime le dossier `data/`.
 mvn -pl livraison-process test
 ```
 
-`ProcessusLivraisonTest` couvre les quatre chemins : livraison simple, validation approuvée,
+`ProcessusLivraisonTest` couvre les chemins clés : DMN → `aucun` / `managers` / `directeurs`, client VIP,
 validation rejetée, et boucle de réapprovisionnement (le timer est déclenché manuellement via
 `ManagementService`, car le job executor est désactivé en test).
 
 ## Pistes d'exercices
 
-1. Remplacer le calcul de montant par une **table de décision DMN** (business rule task).
+1. Ajouter une colonne de sortie à la table DMN (ex. `delaiLivraison`) et l'exploiter dans le process.
 2. Rendre l'événement frontière **interruptif** : annuler la commande si le manager ne répond pas.
 3. Passer `Task_Email` en `camunda:asyncBefore="true"` et observer le job dans Cockpit.
 4. Lever une exception dans un delegate pour voir apparaître un **incident**, puis le rejouer.

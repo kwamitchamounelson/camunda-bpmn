@@ -30,7 +30,7 @@ public class CommandeController {
     @PostMapping
     public ResponseEntity<CommandeResponse> creer(@RequestBody CreerCommandeRequest request) {
         ProcessInstance instance = processService.demarrer(
-                request.client(), request.email(), request.produit(), request.quantite());
+                request.client(), request.email(), request.produit(), request.quantite(), request.typeClient());
 
         Commande commande = commandeService.getObligatoire(instance.getBusinessKey());
         return ResponseEntity.status(HttpStatus.CREATED).body(CommandeResponse.from(commande));

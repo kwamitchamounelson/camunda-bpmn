@@ -9,6 +9,7 @@ public class Commande {
     private final String email;
     private final String produit;
     private final int quantite;
+    private final String typeClient;
     private final Instant creeeLe;
 
     private StatutCommande statut;
@@ -17,12 +18,13 @@ public class Commande {
     private String numeroSuivi;
     private String motifRefus;
 
-    public Commande(String id, String client, String email, String produit, int quantite) {
+    public Commande(String id, String client, String email, String produit, int quantite, String typeClient) {
         this.id = id;
         this.client = client;
         this.email = email;
         this.produit = produit;
         this.quantite = quantite;
+        this.typeClient = typeClient;
         this.creeeLe = Instant.now();
         this.statut = StatutCommande.NOUVELLE;
     }
@@ -45,6 +47,10 @@ public class Commande {
 
     public int getQuantite() {
         return quantite;
+    }
+
+    public String getTypeClient() {
+        return typeClient;
     }
 
     public Instant getCreeeLe() {

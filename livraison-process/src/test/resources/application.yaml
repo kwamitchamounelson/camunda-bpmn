@@ -12,7 +12,7 @@ camunda:
       password: demo
     database:
       schema-update: true
-    deployment-resource-pattern: classpath*:bpmn/*.bpmn
+    deployment-resource-pattern: classpath*:bpmn/*.bpmn, classpath*:dmn/*.dmn
     job-execution:
       # Pas de job executor en test : l'execution reste synchrone et deterministe.
       enabled: false

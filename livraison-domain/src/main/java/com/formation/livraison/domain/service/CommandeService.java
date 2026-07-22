@@ -21,9 +21,10 @@ public class CommandeService {
         this.repository = repository;
     }
 
-    public Commande creer(String client, String email, String produit, int quantite) {
+    public Commande creer(String client, String email, String produit, int quantite, String typeClient) {
         String id = "CMD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        Commande commande = new Commande(id, client, email, produit, quantite);
+        String type = (typeClient == null || typeClient.isBlank()) ? "STANDARD" : typeClient.toUpperCase();
+        Commande commande = new Commande(id, client, email, produit, quantite, type);
         repository.save(commande);
         log.info("Commande creee : {}", commande);
         return commande;

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_niveau" name="Validation" namespace="http://camunda.org/schema/1.0/dmn"
+             exporter="Camunda Modeler" exporterVersion="5.31.0">
+  <decision id="niveauValidation" name="Niveau de validation requis">
+    <decisionTable id="DecisionTable_1" hitPolicy="FIRST">
+
+      <input id="Input_client" label="Type de client">
+        <inputExpression id="InputExpression_client" typeRef="string">
+          <text>typeClient</text>
+        </inputExpression>
+      </input>
+      <input id="Input_montant" label="Montant (€)">
+        <inputExpression id="InputExpression_montant" typeRef="double">
+          <text>montant</text>
+        </inputExpression>
+      </input>
+
+      <output id="Output_validateur" label="Validateur requis" name="validateur" typeRef="string" />
+
+      <rule id="Rule_vip_ok">
+        <description>VIP : validation seulement sur les très gros montants</description>
+        <inputEntry id="e11"><text>"VIP"</text></inputEntry>
+        <inputEntry id="e12"><text>&lt; 10000</text></inputEntry>
+        <outputEntry id="o11"><text>"aucun"</text></outputEntry>
+      </rule>
+      <rule id="Rule_vip_gros">
+        <inputEntry id="e21"><text>"VIP"</text></inputEntry>
+        <inputEntry id="e22"><text>&gt;= 10000</text></inputEntry>
+        <outputEntry id="o21"><text>"directeurs"</text></outputEntry>
+      </rule>
+      <rule id="Rule_std_petit">
+        <description>Client standard : moins de 1000 € sans validation</description>
+        <inputEntry id="e31"><text></text></inputEntry>
+        <inputEntry id="e32"><text>&lt; 1000</text></inputEntry>
+        <outputEntry id="o31"><text>"aucun"</text></outputEntry>
+      </rule>
+      <rule id="Rule_std_moyen">
+        <inputEntry id="e41"><text></text></inputEntry>
+        <inputEntry id="e42"><text>[1000..5000)</text></inputEntry>
+        <outputEntry id="o41"><text>"managers"</text></outputEntry>
+      </rule>
+      <rule id="Rule_std_gros">
+        <inputEntry id="e51"><text></text></inputEntry>
+        <inputEntry id="e52"><text>&gt;= 5000</text></inputEntry>
+        <outputEntry id="o51"><text>"directeurs"</text></outputEntry>
+      </rule>
+
+    </decisionTable>
+  </decision>
+
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram>
+      <dmndi:DMNShape dmnElementRef="niveauValidation">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

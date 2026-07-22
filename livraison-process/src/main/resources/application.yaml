@@ -24,8 +24,8 @@ camunda:
       create: Toutes les taches
     database:
       schema-update: true
-    # Deploie tous les BPMN presents dans src/main/resources/bpmn
-    deployment-resource-pattern: classpath*:bpmn/*.bpmn
+    # Deploie les BPMN et les DMN presents dans les ressources
+    deployment-resource-pattern: classpath*:bpmn/*.bpmn, classpath*:dmn/*.dmn
     history-level: full
     webapp:
       index-redirect-enabled: true

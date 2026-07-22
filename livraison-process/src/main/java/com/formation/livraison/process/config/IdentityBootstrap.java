@@ -10,9 +10,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Cree les comptes de demonstration attendus par le BPMN :
+ * Cree les comptes de demonstration attendus par le BPMN et le DMN :
  *  - Task_Prepa      -> candidateGroups="logistique"
- *  - Task_Validation -> candidateGroups="managers"
+ *  - Task_Validation -> candidateGroups="${validateur}" (managers ou directeurs,
+ *                       selon la decision DMN niveauValidation)
  * Sans eux, les taches existeraient sans destinataire capable de se connecter.
  */
 @Configuration
@@ -25,11 +26,14 @@ public class IdentityBootstrap {
         return args -> {
             creerGroupe(identityService, "logistique", "Logistique");
             creerGroupe(identityService, "managers", "Managers");
+            creerGroupe(identityService, "directeurs", "Directeurs");
 
             creerUtilisateur(identityService, "employeLogistique", "Employe", "Logistique",
                     "logistique@formation.local", "logistique");
             creerUtilisateur(identityService, "manager", "Marie", "Manager",
                     "manager@formation.local", "managers");
+            creerUtilisateur(identityService, "directeur", "Denis", "Directeur",
+                    "directeur@formation.local", "directeurs");
         };
     }
 

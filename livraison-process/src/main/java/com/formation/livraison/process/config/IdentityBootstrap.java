@@ -10,47 +10,52 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Le BPMN affecte Task_2 a l'utilisateur "employeLogistique". Sans ce compte,
- * la tache existe mais personne ne peut se connecter pour la traiter.
+ * Cree les comptes de demonstration attendus par le BPMN :
+ *  - Task_Prepa      -> candidateGroups="logistique"
+ *  - Task_Validation -> candidateGroups="managers"
+ * Sans eux, les taches existeraient sans destinataire capable de se connecter.
  */
 @Configuration
 public class IdentityBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(IdentityBootstrap.class);
 
-    private static final String USER_ID = "employeLogistique";
-    private static final String GROUP_ID = "logistique";
-
     @Bean
     public ApplicationRunner creerUtilisateursDemo(IdentityService identityService) {
         return args -> {
-            creerGroupeSiAbsent(identityService);
-            creerUtilisateurSiAbsent(identityService);
+            creerGroupe(identityService, "logistique", "Logistique");
+            creerGroupe(identityService, "managers", "Managers");
+
+            creerUtilisateur(identityService, "employeLogistique", "Employe", "Logistique",
+                    "logistique@formation.local", "logistique");
+            creerUtilisateur(identityService, "manager", "Marie", "Manager",
+                    "manager@formation.local", "managers");
         };
     }
 
-    private void creerGroupeSiAbsent(IdentityService identityService) {
-        if (identityService.createGroupQuery().groupId(GROUP_ID).count() > 0) {
+    private void creerGroupe(IdentityService identityService, String id, String nom) {
+        if (identityService.createGroupQuery().groupId(id).count() > 0) {
             return;
         }
-        Group groupe = identityService.newGroup(GROUP_ID);
-        groupe.setName("Logistique");
+        Group groupe = identityService.newGroup(id);
+        groupe.setName(nom);
         groupe.setType("WORKFLOW");
         identityService.saveGroup(groupe);
-        log.info("Groupe '{}' cree", GROUP_ID);
+        log.info("Groupe '{}' cree", id);
     }
 
-    private void creerUtilisateurSiAbsent(IdentityService identityService) {
-        if (identityService.createUserQuery().userId(USER_ID).count() > 0) {
+    private void creerUtilisateur(IdentityService identityService, String userId,
+                                  String prenom, String nom, String email, String groupe) {
+        if (identityService.createUserQuery().userId(userId).count() > 0) {
             return;
         }
-        User user = identityService.newUser(USER_ID);
-        user.setFirstName("Employe");
-        user.setLastName("Logistique");
+        User user = identityService.newUser(userId);
+        user.setFirstName(prenom);
+        user.setLastName(nom);
         user.setPassword("demo");
-        user.setEmail("logistique@formation.local");
+        user.setEmail(email);
         identityService.saveUser(user);
-        identityService.createMembership(USER_ID, GROUP_ID);
-        log.info("Utilisateur '{}' cree (mot de passe : demo)", USER_ID);
+        identityService.createMembership(userId, groupe);
+        log.info("Utilisateur '{}' cree (groupe '{}', mot de passe : demo)", userId, groupe);
     }
 }

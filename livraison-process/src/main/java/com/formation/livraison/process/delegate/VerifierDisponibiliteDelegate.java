@@ -35,8 +35,8 @@ public class VerifierDisponibiliteDelegate implements JavaDelegate {
 
         boolean disponible = stockService.estDisponible(commande.getProduit(), commande.getQuantite());
 
-        // Ecrite en variable de processus : visible dans Cockpit et exploitable
-        // par une passerelle exclusive si tu enrichis le modele plus tard.
+        // Ecrite en variable de processus : visible dans Cockpit et lue par la
+        // passerelle exclusive Gw_Stock (condition ${disponible}).
         execution.setVariable(ProcessVariables.DISPONIBLE, disponible);
 
         commandeService.changerStatut(commandeId,

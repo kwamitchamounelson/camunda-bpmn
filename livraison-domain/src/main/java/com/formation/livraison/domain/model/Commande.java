@@ -13,6 +13,9 @@ public class Commande {
 
     private StatutCommande statut;
     private String processInstanceId;
+    private double montant;
+    private String numeroSuivi;
+    private String motifRefus;
 
     public Commande(String id, String client, String email, String produit, int quantite) {
         this.id = id;
@@ -64,9 +67,33 @@ public class Commande {
         this.processInstanceId = processInstanceId;
     }
 
+    public double getMontant() {
+        return montant;
+    }
+
+    public void setMontant(double montant) {
+        this.montant = montant;
+    }
+
+    public String getNumeroSuivi() {
+        return numeroSuivi;
+    }
+
+    public void setNumeroSuivi(String numeroSuivi) {
+        this.numeroSuivi = numeroSuivi;
+    }
+
+    public String getMotifRefus() {
+        return motifRefus;
+    }
+
+    public void setMotifRefus(String motifRefus) {
+        this.motifRefus = motifRefus;
+    }
+
     @Override
     public String toString() {
-        return "Commande{id=%s, client=%s, produit=%s, quantite=%d, statut=%s}"
-                .formatted(id, client, produit, quantite, statut);
+        return "Commande{id=%s, client=%s, produit=%s, quantite=%d, montant=%.2f, statut=%s}"
+                .formatted(id, client, produit, quantite, montant, statut);
     }
 }

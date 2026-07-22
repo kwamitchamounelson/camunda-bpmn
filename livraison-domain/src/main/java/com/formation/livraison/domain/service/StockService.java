@@ -33,4 +33,17 @@ public class StockService {
     public int stockRestant(String produit) {
         return stocks.getOrDefault(produit.toLowerCase(), 0);
     }
+
+    /**
+     * Reapprovisionne le produit pour couvrir la quantite demandee, avec une marge.
+     * Rend le prochain controle de disponibilite positif : la boucle du processus
+     * finit donc par sortir de l'etat de rupture.
+     */
+    public int reapprovisionner(String produit, int quantiteDemandee) {
+        String cle = produit.toLowerCase();
+        int ajout = Math.max(quantiteDemandee, 10) + 5;
+        int nouveau = stocks.merge(cle, ajout, Integer::sum);
+        log.info("Reapprovisionnement : produit={}, ajout={}, stock={}", produit, ajout, nouveau);
+        return nouveau;
+    }
 }

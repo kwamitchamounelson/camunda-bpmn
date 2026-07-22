@@ -1,64 +1,259 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.31.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.22.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Camunda Modeler" exporterVersion="5.31.0"
+                  modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.22.0">
   <bpmn:process id="ProcessusLivraison" name="Processus de livraison" isExecutable="true" camunda:historyTimeToLive="P180D">
+
     <bpmn:startEvent id="StartEvent_1" name="Commande passée" />
-    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_1" />
-    <bpmn:serviceTask id="Task_1" name="Vérifier disponibilité" camunda:delegateExpression="#{verifierDisponibilite}" />
-    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_1" targetRef="Task_2" />
-    <bpmn:userTask id="Task_2" name="Préparer la commande" camunda:assignee="employeLogistique" />
-    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_2" targetRef="Task_3" />
-    <bpmn:serviceTask id="Task_3" name="Envoyer email de confirmation" camunda:delegateExpression="#{envoyerEmailConfirmation}" />
-    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_3" targetRef="Task_4" />
-    <bpmn:serviceTask id="Task_4" name="Compléter la commande" camunda:delegateExpression="#{completeOrder}" />
-    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_4" targetRef="EndEvent_1" />
+    <bpmn:sequenceFlow id="Flow_01" sourceRef="StartEvent_1" targetRef="Task_VerifStock" />
+
+    <bpmn:serviceTask id="Task_VerifStock" name="Vérifier disponibilité" camunda:delegateExpression="#{verifierDisponibilite}" />
+    <bpmn:sequenceFlow id="Flow_02" sourceRef="Task_VerifStock" targetRef="Gw_Stock" />
+
+    <bpmn:exclusiveGateway id="Gw_Stock" name="Stock disponible ?" default="Flow_Rupture" />
+    <bpmn:sequenceFlow id="Flow_Dispo" name="disponible" sourceRef="Gw_Stock" targetRef="Task_Montant">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${disponible}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Rupture" name="rupture" sourceRef="Gw_Stock" targetRef="Task_Reappro" />
+
+    <bpmn:serviceTask id="Task_Reappro" name="Lancer réapprovisionnement" camunda:delegateExpression="#{lancerReapprovisionnement}" />
+    <bpmn:sequenceFlow id="Flow_03" sourceRef="Task_Reappro" targetRef="Timer_Reappro" />
+
+    <bpmn:intermediateCatchEvent id="Timer_Reappro" name="Attendre réappro (30s)">
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT30S</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="Flow_04" sourceRef="Timer_Reappro" targetRef="Task_VerifStock" />
+
+    <bpmn:serviceTask id="Task_Montant" name="Calculer le montant" camunda:delegateExpression="#{calculerMontant}" />
+    <bpmn:sequenceFlow id="Flow_05" sourceRef="Task_Montant" targetRef="Gw_Montant" />
+
+    <bpmn:exclusiveGateway id="Gw_Montant" name="Montant &gt; 1000 € ?" default="Flow_MontantOk" />
+    <bpmn:sequenceFlow id="Flow_Eleve" name="oui" sourceRef="Gw_Montant" targetRef="Task_Validation">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${montant &gt; 1000}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_MontantOk" name="non" sourceRef="Gw_Montant" targetRef="Gw_PrepaJoin" />
+
+    <bpmn:userTask id="Task_Validation" name="Valider la commande" camunda:candidateGroups="managers">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="approuve" label="Approuver la commande ?" type="boolean" defaultValue="true" />
+          <camunda:formField id="motifRefus" label="Motif (si refus)" type="string" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_06" sourceRef="Task_Validation" targetRef="Gw_ValidDecision" />
+
+    <bpmn:boundaryEvent id="Boundary_Rappel" name="Rappel manager (2 min)" cancelActivity="false" attachedToRef="Task_Validation">
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2M</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="Boundary_Rappel" targetRef="Task_Rappel" />
+
+    <bpmn:serviceTask id="Task_Rappel" name="Envoyer un rappel" camunda:delegateExpression="#{envoyerRappel}" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Task_Rappel" targetRef="End_Rappel" />
+    <bpmn:endEvent id="End_Rappel" name="Rappel envoyé" />
+
+    <bpmn:exclusiveGateway id="Gw_ValidDecision" name="Approuvée ?" default="Flow_Rejete" />
+    <bpmn:sequenceFlow id="Flow_Approuve" name="oui" sourceRef="Gw_ValidDecision" targetRef="Gw_PrepaJoin">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approuve}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Rejete" name="non" sourceRef="Gw_ValidDecision" targetRef="Task_Annuler" />
+
+    <bpmn:serviceTask id="Task_Annuler" name="Annuler la commande" camunda:delegateExpression="#{annulerCommande}" />
+    <bpmn:sequenceFlow id="Flow_07" sourceRef="Task_Annuler" targetRef="End_Refus" />
+    <bpmn:endEvent id="End_Refus" name="Commande refusée" />
+
+    <bpmn:exclusiveGateway id="Gw_PrepaJoin" />
+    <bpmn:sequenceFlow id="Flow_08" sourceRef="Gw_PrepaJoin" targetRef="Task_Prepa" />
+
+    <bpmn:userTask id="Task_Prepa" name="Préparer la commande" camunda:candidateGroups="logistique" />
+    <bpmn:sequenceFlow id="Flow_09" sourceRef="Task_Prepa" targetRef="Gw_Par1" />
+
+    <bpmn:parallelGateway id="Gw_Par1" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Gw_Par1" targetRef="Task_Email" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Gw_Par1" targetRef="Task_Expedition" />
+
+    <bpmn:serviceTask id="Task_Email" name="Envoyer email de confirmation" camunda:delegateExpression="#{envoyerEmailConfirmation}" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Task_Email" targetRef="Gw_Par2" />
+
+    <bpmn:serviceTask id="Task_Expedition" name="Planifier l'expédition" camunda:delegateExpression="#{planifierExpedition}" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Task_Expedition" targetRef="Gw_Par2" />
+
+    <bpmn:parallelGateway id="Gw_Par2" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Gw_Par2" targetRef="Task_Complete" />
+
+    <bpmn:serviceTask id="Task_Complete" name="Compléter la commande" camunda:delegateExpression="#{completeOrder}" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="Task_Complete" targetRef="EndEvent_1" />
+
     <bpmn:endEvent id="EndEvent_1" name="Commande livrée" />
   </bpmn:process>
+
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="ProcessusLivraison">
+
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
-        <dc:Bounds x="182" y="102" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="171" y="138" width="58" height="27" />
-        </bpmndi:BPMNLabel>
+        <dc:Bounds x="160" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="145" y="145" width="70" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_1_di" bpmnElement="Task_1">
-        <dc:Bounds x="280" y="80" width="100" height="80" />
+      <bpmndi:BPMNShape id="Task_VerifStock_di" bpmnElement="Task_VerifStock">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_2_di" bpmnElement="Task_2">
-        <dc:Bounds x="480" y="80" width="100" height="80" />
+      <bpmndi:BPMNShape id="Gw_Stock_di" bpmnElement="Gw_Stock" isMarkerVisible="true">
+        <dc:Bounds x="410" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="398" y="65" width="74" height="27" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_3_di" bpmnElement="Task_3">
-        <dc:Bounds x="680" y="80" width="100" height="80" />
+      <bpmndi:BPMNShape id="Task_Reappro_di" bpmnElement="Task_Reappro">
+        <dc:Bounds x="385" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_4_di" bpmnElement="Task_4">
-        <dc:Bounds x="880" y="80" width="100" height="80" />
+      <bpmndi:BPMNShape id="Timer_Reappro_di" bpmnElement="Timer_Reappro">
+        <dc:Bounds x="282" y="272" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="258" y="315" width="85" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Montant_di" bpmnElement="Task_Montant">
+        <dc:Bounds x="520" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Montant_di" bpmnElement="Gw_Montant" isMarkerVisible="true">
+        <dc:Bounds x="680" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="665" y="65" width="82" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Validation_di" bpmnElement="Task_Validation">
+        <dc:Bounds x="790" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_Rappel_di" bpmnElement="Boundary_Rappel">
+        <dc:Bounds x="822" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="860" y="176" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Rappel_di" bpmnElement="Task_Rappel">
+        <dc:Bounds x="790" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rappel_di" bpmnElement="End_Rappel">
+        <dc:Bounds x="822" y="400" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="808" y="443" width="66" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ValidDecision_di" bpmnElement="Gw_ValidDecision" isMarkerVisible="true">
+        <dc:Bounds x="950" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="945" y="65" width="60" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Annuler_di" bpmnElement="Task_Annuler">
+        <dc:Bounds x="925" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Refus_di" bpmnElement="End_Refus">
+        <dc:Bounds x="957" y="400" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="937" y="443" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_PrepaJoin_di" bpmnElement="Gw_PrepaJoin" isMarkerVisible="true">
+        <dc:Bounds x="1055" y="95" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Prepa_di" bpmnElement="Task_Prepa">
+        <dc:Bounds x="1150" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Par1_di" bpmnElement="Gw_Par1">
+        <dc:Bounds x="1320" y="95" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Email_di" bpmnElement="Task_Email">
+        <dc:Bounds x="1440" y="20" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Expedition_di" bpmnElement="Task_Expedition">
+        <dc:Bounds x="1440" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Par2_di" bpmnElement="Gw_Par2">
+        <dc:Bounds x="1610" y="95" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Complete_di" bpmnElement="Task_Complete">
+        <dc:Bounds x="1690" y="80" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-        <dc:Bounds x="1080" y="102" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1055" y="138" width="87" height="14" />
-        </bpmndi:BPMNLabel>
+        <dc:Bounds x="1860" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1838" y="145" width="82" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
-        <di:waypoint x="218" y="120" />
-        <di:waypoint x="280" y="120" />
+
+      <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
+        <di:waypoint x="196" y="120" /><di:waypoint x="250" y="120" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
-        <di:waypoint x="380" y="120" />
-        <di:waypoint x="480" y="120" />
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="350" y="120" /><di:waypoint x="410" y="120" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
-        <di:waypoint x="580" y="120" />
-        <di:waypoint x="680" y="120" />
+      <bpmndi:BPMNEdge id="Flow_Dispo_di" bpmnElement="Flow_Dispo">
+        <di:waypoint x="460" y="120" /><di:waypoint x="520" y="120" />
+        <bpmndi:BPMNLabel><dc:Bounds x="470" y="102" width="46" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
-        <di:waypoint x="780" y="120" />
-        <di:waypoint x="880" y="120" />
+      <bpmndi:BPMNEdge id="Flow_Rupture_di" bpmnElement="Flow_Rupture">
+        <di:waypoint x="435" y="145" /><di:waypoint x="435" y="250" />
+        <bpmndi:BPMNLabel><dc:Bounds x="441" y="190" width="37" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
-        <di:waypoint x="980" y="120" />
-        <di:waypoint x="1080" y="120" />
+      <bpmndi:BPMNEdge id="Flow_03_di" bpmnElement="Flow_03">
+        <di:waypoint x="385" y="290" /><di:waypoint x="318" y="290" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_04_di" bpmnElement="Flow_04">
+        <di:waypoint x="300" y="272" /><di:waypoint x="300" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="620" y="120" /><di:waypoint x="680" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Eleve_di" bpmnElement="Flow_Eleve">
+        <di:waypoint x="730" y="120" /><di:waypoint x="790" y="120" />
+        <bpmndi:BPMNLabel><dc:Bounds x="752" y="102" width="17" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_MontantOk_di" bpmnElement="Flow_MontantOk">
+        <di:waypoint x="705" y="145" /><di:waypoint x="705" y="200" />
+        <di:waypoint x="1080" y="200" /><di:waypoint x="1080" y="145" />
+        <bpmndi:BPMNLabel><dc:Bounds x="711" y="176" width="17" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06_di" bpmnElement="Flow_06">
+        <di:waypoint x="890" y="120" /><di:waypoint x="950" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="840" y="178" /><di:waypoint x="840" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="840" y="330" /><di:waypoint x="840" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Approuve_di" bpmnElement="Flow_Approuve">
+        <di:waypoint x="1000" y="120" /><di:waypoint x="1055" y="120" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1018" y="102" width="17" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Rejete_di" bpmnElement="Flow_Rejete">
+        <di:waypoint x="975" y="145" /><di:waypoint x="975" y="250" />
+        <bpmndi:BPMNLabel><dc:Bounds x="981" y="190" width="17" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07_di" bpmnElement="Flow_07">
+        <di:waypoint x="975" y="330" /><di:waypoint x="975" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08_di" bpmnElement="Flow_08">
+        <di:waypoint x="1105" y="120" /><di:waypoint x="1150" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_di" bpmnElement="Flow_09">
+        <di:waypoint x="1250" y="120" /><di:waypoint x="1320" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1345" y="95" /><di:waypoint x="1345" y="60" /><di:waypoint x="1440" y="60" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1345" y="145" /><di:waypoint x="1345" y="220" /><di:waypoint x="1440" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1540" y="60" /><di:waypoint x="1635" y="60" /><di:waypoint x="1635" y="95" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1540" y="220" /><di:waypoint x="1635" y="220" /><di:waypoint x="1635" y="145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1660" y="120" /><di:waypoint x="1690" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1790" y="120" /><di:waypoint x="1860" y="120" />
+      </bpmndi:BPMNEdge>
+
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>

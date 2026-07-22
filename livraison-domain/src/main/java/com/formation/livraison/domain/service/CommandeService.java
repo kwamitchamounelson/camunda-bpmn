@@ -51,4 +51,24 @@ public class CommandeService {
         commande.setProcessInstanceId(processInstanceId);
         repository.save(commande);
     }
+
+    public void enregistrerMontant(String id, double montant) {
+        Commande commande = getObligatoire(id);
+        commande.setMontant(montant);
+        repository.save(commande);
+    }
+
+    public void enregistrerSuivi(String id, String numeroSuivi) {
+        Commande commande = getObligatoire(id);
+        commande.setNumeroSuivi(numeroSuivi);
+        repository.save(commande);
+    }
+
+    public void enregistrerRefus(String id, String motif) {
+        Commande commande = getObligatoire(id);
+        commande.setMotifRefus(motif);
+        commande.setStatut(StatutCommande.REFUSEE);
+        repository.save(commande);
+        log.info("Commande {} refusee : {}", id, motif);
+    }
 }

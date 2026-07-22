@@ -13,6 +13,9 @@ public final class ProcessVariables {
     public static final String QUANTITE = "quantite";
     public static final String CLIENT = "client";
     public static final String DISPONIBLE = "disponible";
+    public static final String MONTANT = "montant";
+    public static final String APPROUVE = "approuve";
+    public static final String MOTIF_REFUS = "motifRefus";
 
     private ProcessVariables() {
     }

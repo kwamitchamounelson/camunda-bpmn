@@ -32,6 +32,17 @@ camunda:
     webapp:
       index-redirect-enabled: true
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    display-request-duration: true
+  # Limite la doc a l'API metier : evite d'exposer les endpoints techniques
+  # eventuellement apportes par les webapps Camunda.
+  paths-to-match: /api/**
+
 logging:
   level:
     com.formation.livraison: DEBUG

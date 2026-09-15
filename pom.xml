@@ -28,6 +28,8 @@
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <camunda.version>7.22.0</camunda.version>
+    <!-- springdoc 2.6.x est la ligne alignee sur Spring Boot 3.3 / Jakarta EE 10 -->
+    <springdoc.version>2.6.0</springdoc.version>
   </properties>
 
   <dependencyManagement>
@@ -44,6 +46,12 @@
         <groupId>com.formation.livraison</groupId>
         <artifactId>livraison-domain</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <!-- Swagger UI + generation de la spec OpenAPI 3 a partir des controleurs Spring MVC -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

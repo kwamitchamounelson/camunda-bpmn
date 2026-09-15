@@ -11,6 +11,14 @@ buildNumber.properties
 .mvn/wrapper/maven-wrapper.jar
 # Le wrapper Maven (mvnw/mvnw.cmd) doit rester versionne s'il est ajoute
 
+### Front React (livraison-front) ###
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
 ### Java / compilation ###
 *.class
 *.jar

@@ -5,11 +5,13 @@ spring:
   application:
     name: livraison-process
   datasource:
-    # Base fichier : l'historique des instances survit aux redemarrages,
-    # indispensable pour explorer Cockpit sereinement.
-    # AUTO_SERVER=TRUE permet d'ouvrir la base depuis un client externe pendant
-    # que l'appli tourne ; H2 2.x refuse de le combiner avec DB_CLOSE_ON_EXIT.
-    url: jdbc:h2:file:./data/camunda-db;AUTO_SERVER=TRUE
+    # Base 100 % en memoire : rien n'est ecrit sur disque, tout disparait a l'arret.
+    # C'est volontaire et necessaire ici : CommandeRepository est une map en memoire,
+    # donc une base moteur persistante survivrait aux commandes et laisserait des
+    # instances orphelines ("Commande introuvable") apres un redemarrage.
+    # DB_CLOSE_DELAY=-1 garde la base vivante quand le pool ferme sa derniere
+    # connexion ; sans lui H2 detruirait le schema en cours d'execution.
+    url: jdbc:h2:mem:camunda-livraison;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
     username: sa
     password: sa

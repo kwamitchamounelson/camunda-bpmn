@@ -198,8 +198,17 @@ Suivre une commande côté métier : `GET http://localhost:8080/api/commandes/{i
 
 ## Base de données
 
-H2 en fichier (`livraison-process/data/camunda-db.mv.db`) : l'historique survit aux redémarrages.
-Pour repartir de zéro, supprime le dossier `data/`.
+H2 **en mémoire** (`jdbc:h2:mem:camunda-livraison`) : rien n'est écrit sur disque, ni schéma, ni
+historique. Chaque démarrage repart d'un moteur vierge, le BPMN et le DMN sont redéployés, et les
+comptes de démonstration sont recréés.
+
+C'est un choix assumé, pas une commodité : `CommandeRepository` stocke les commandes dans une map en
+mémoire. Une base moteur persistante survivrait donc aux commandes et laisserait après redémarrage
+des instances en cours dont la commande a disparu — tâches impossibles à compléter, avec l'erreur
+`Commande introuvable`. Les deux stockages sont maintenant alignés sur le même cycle de vie.
+
+Conséquence à connaître : l'historique Cockpit ne couvre que la session en cours. Pour une démo cela
+suffit largement ; il faut simplement éviter de redémarrer le backend avec des instances en vol.
 
 ## Tests
 

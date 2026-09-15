@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -32,6 +33,55 @@ public class StockService {
 
     public int stockRestant(String produit) {
         return stocks.getOrDefault(produit.toLowerCase(), 0);
+    }
+
+    /**
+     * Photo triee de l'etat du stock. Copie defensive : l'appelant ne peut pas
+     * modifier le magasin en passant par la map retournee.
+     */
+    public Map<String, Integer> tousLesStocks() {
+        return new TreeMap<>(stocks);
+    }
+
+    /**
+     * Fixe la quantite d'un produit, en creant l'entree si le produit est inconnu.
+     * Sert a mettre en place un scenario : passer "casque" a 0 pour forcer la rupture,
+     * ou le remonter pour debloquer une instance en attente de reapprovisionnement.
+     */
+    public int definir(String produit, int quantite) {
+        if (quantite < 0) {
+            throw new IllegalArgumentException("Quantite negative interdite : " + quantite);
+        }
+        String cle = cle(produit);
+        stocks.put(cle, quantite);
+        log.info("Stock fixe : produit={}, stock={}", cle, quantite);
+        return quantite;
+    }
+
+    /**
+     * Applique un mouvement signe (entree positive, sortie negative).
+     * Le calcul se fait dans un compute() : si le resultat est negatif,
+     * l'exception remonte et le stock reste inchange.
+     */
+    public int ajuster(String produit, int mouvement) {
+        String cle = cle(produit);
+        int nouveau = stocks.compute(cle, (produitCle, courant) -> {
+            int restant = (courant == null ? 0 : courant) + mouvement;
+            if (restant < 0) {
+                throw new IllegalArgumentException("Mouvement refuse : stock de %s = %d, mouvement demande = %d"
+                        .formatted(produitCle, courant == null ? 0 : courant, mouvement));
+            }
+            return restant;
+        });
+        log.info("Mouvement de stock : produit={}, mouvement={}, stock={}", cle, mouvement, nouveau);
+        return nouveau;
+    }
+
+    private String cle(String produit) {
+        if (produit == null || produit.isBlank()) {
+            throw new IllegalArgumentException("Produit obligatoire");
+        }
+        return produit.toLowerCase();
     }
 
     /**

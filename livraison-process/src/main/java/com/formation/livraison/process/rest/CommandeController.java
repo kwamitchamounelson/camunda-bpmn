@@ -67,11 +67,10 @@ public class CommandeController {
         return commandeService.lister().stream().map(CommandeResponse::from).toList();
     }
 
-    @Operation(summary = "Consulter une commande",
-            description = "Un id inconnu leve une IllegalArgumentException et se traduit par une erreur 500.")
+    @Operation(summary = "Consulter une commande")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Commande trouvee"),
-            @ApiResponse(responseCode = "500", description = "Commande introuvable", content = @Content)
+            @ApiResponse(responseCode = "400", description = "Commande introuvable", content = @Content)
     })
     @GetMapping("/{id}")
     public CommandeResponse detail(

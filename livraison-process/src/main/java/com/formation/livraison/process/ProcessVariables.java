@@ -8,6 +8,10 @@ public final class ProcessVariables {
 
     public static final String PROCESS_KEY = "ProcessusLivraison";
 
+    /** Ids des taches utilisateur du BPMN, utilises par l'API REST pour cibler la bonne tache. */
+    public static final String TASK_VALIDATION = "Task_Validation";
+    public static final String TASK_PREPARATION = "Task_Prepa";
+
     public static final String COMMANDE_ID = "commandeId";
     public static final String PRODUIT = "produit";
     public static final String QUANTITE = "quantite";

@@ -5,7 +5,9 @@
              xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
              id="Definitions_niveau" name="Validation" namespace="http://camunda.org/schema/1.0/dmn"
              exporter="Camunda Modeler" exporterVersion="5.31.0">
-  <decision id="niveauValidation" name="Niveau de validation requis">
+  <!-- historyTimeToLive est obligatoire depuis Camunda 7.20 (enforceHistoryTimeToLive),
+       au meme titre que sur le processus BPMN : sans lui le deploiement echoue. -->
+  <decision id="niveauValidation" name="Niveau de validation requis" camunda:historyTimeToLive="P180D">
     <decisionTable id="DecisionTable_1" hitPolicy="FIRST">
 
       <input id="Input_client" label="Type de client">

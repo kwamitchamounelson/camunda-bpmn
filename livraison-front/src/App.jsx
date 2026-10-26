@@ -4,6 +4,7 @@ import BackOffice from './composants/BackOffice.jsx';
 import Boutique from './composants/Boutique.jsx';
 import Commandes from './composants/Commandes.jsx';
 import JournalRest from './composants/JournalRest.jsx';
+import Pret from './composants/pret/Pret.jsx';
 import Stocks from './composants/Stocks.jsx';
 
 const ONGLETS = [
@@ -11,13 +12,20 @@ const ONGLETS = [
   { cle: 'commandes', libelle: 'Mes commandes', icone: '🧾' },
   { cle: 'backoffice', libelle: 'Back-office', icone: '📋' },
   { cle: 'stocks', libelle: 'Stocks', icone: '📦' },
+  { cle: 'pret', libelle: 'Prêt immobilier', icone: '🏠' },
 ];
 
 const PERIODE_RAFRAICHISSEMENT = 2000;
 
 export default function App() {
   const [onglet, setOnglet] = useState('boutique');
-  const [donnees, setDonnees] = useState({ stocks: [], commandes: [], taches: [] });
+  const [donnees, setDonnees] = useState({
+    stocks: [],
+    commandes: [],
+    taches: [],
+    prets: [],
+    tachesPret: [],
+  });
   const [selection, setSelection] = useState(null);
   const [message, setMessage] = useState(null);
   const [horsLigne, setHorsLigne] = useState(false);
@@ -27,12 +35,14 @@ export default function App() {
   const charger = useCallback(async (silencieux = true) => {
     const options = { silencieux };
     try {
-      const [stocks, commandes, taches] = await Promise.all([
+      const [stocks, commandes, taches, prets, tachesPret] = await Promise.all([
         api.stocks(options),
         api.commandes(options),
         api.taches(options),
+        api.prets(options),
+        api.tachesPret(options),
       ]);
-      setDonnees({ stocks, commandes, taches });
+      setDonnees({ stocks, commandes, taches, prets, tachesPret });
       setHorsLigne(false);
     } catch (erreur) {
       setHorsLigne(true);
@@ -77,6 +87,7 @@ export default function App() {
   );
 
   const nbTaches = donnees.taches.length;
+  const nbTachesPret = donnees.tachesPret.length;
 
   return (
     <div className={`application ${journalOuvert ? '' : 'application--journal-replie'}`}>
@@ -85,7 +96,7 @@ export default function App() {
           <span className="entete__logo">📦</span>
           <div>
             <h1>Livraison Express</h1>
-            <p>Démonstration du processus Camunda de bout en bout</p>
+            <p>Démonstration des processus Camunda de bout en bout</p>
           </div>
         </div>
 
@@ -100,6 +111,9 @@ export default function App() {
               {element.libelle}
               {element.cle === 'backoffice' && nbTaches > 0 && (
                 <span className="onglet__pastille">{nbTaches}</span>
+              )}
+              {element.cle === 'pret' && nbTachesPret > 0 && (
+                <span className="onglet__pastille">{nbTachesPret}</span>
               )}
             </button>
           ))}
@@ -147,6 +161,10 @@ export default function App() {
         )}
 
         {onglet === 'stocks' && <Stocks stocks={donnees.stocks} executer={executer} />}
+
+        {onglet === 'pret' && (
+          <Pret prets={donnees.prets} taches={donnees.tachesPret} executer={executer} />
+        )}
       </main>
 
       <JournalRest ouvert={journalOuvert} surBascule={() => setJournalOuvert((o) => !o)} />

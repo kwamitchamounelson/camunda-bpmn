@@ -16,10 +16,11 @@
   <version>1.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>livraison-parent</name>
-  <description>Apprentissage Camunda 7 : processus de livraison</description>
+  <description>Apprentissage Camunda 7 : processus de livraison et d'octroi de pret hypothecaire</description>
 
   <modules>
     <module>livraison-domain</module>
+    <module>pret-process</module>
     <module>livraison-process</module>
   </modules>
 
@@ -45,6 +46,11 @@
       <dependency>
         <groupId>com.formation.livraison</groupId>
         <artifactId>livraison-domain</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.formation.livraison</groupId>
+        <artifactId>pret-process</artifactId>
         <version>${project.version}</version>
       </dependency>
       <!-- Swagger UI + generation de la spec OpenAPI 3 a partir des controleurs Spring MVC -->

@@ -85,6 +85,17 @@ export const api = {
     appeler('POST', `/api/taches/${taskId}/decider`, { approuve, motifRefus }),
   completerTache: (taskId, variables = {}) =>
     appeler('POST', `/api/taches/${taskId}/completer`, { variables }),
+
+  // Processus de pret hypothecaire : meme moteur, API separee sous /api/prets.
+  prets: (options) => appeler('GET', '/api/prets', undefined, options),
+  deposerPret: (demande) => appeler('POST', '/api/prets', demande),
+  declencherTimer: (jobId) => appeler('POST', `/api/prets/timers/${jobId}/declencher`),
+  tachesPret: (options) => appeler('GET', '/api/prets/taches', undefined, options),
+  attribuerTachePret: (taskId, utilisateur) =>
+    appeler('POST', `/api/prets/taches/${taskId}/attribuer`, { utilisateur }),
+  libererTachePret: (taskId) => appeler('POST', `/api/prets/taches/${taskId}/liberer`),
+  completerTachePret: (taskId, variables = {}) =>
+    appeler('POST', `/api/prets/taches/${taskId}/completer`, { variables }),
 };
 
 /** Lien direct vers l'instance dans Cockpit : le coeur de la demo cote moteur. */

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_risque" name="Risque pret" namespace="http://camunda.org/schema/1.0/dmn"
+             exporter="Camunda Modeler" exporterVersion="5.31.0">
+  <!-- Evaluee par Task_Risque une fois les trois analyses paralleles terminees.
+       Hit policy FIRST : les regles sont lues de haut en bas, les refus d'abord. -->
+  <decision id="risquePret" name="Niveau de risque du pret" camunda:historyTimeToLive="P180D">
+    <decisionTable id="DecisionTable_risque" hitPolicy="FIRST">
+
+      <input id="Input_incident" label="Incident bancaire">
+        <inputExpression id="InputExpression_incident" typeRef="boolean">
+          <text>incidentBancaire</text>
+        </inputExpression>
+      </input>
+      <input id="Input_score" label="Score crédit">
+        <inputExpression id="InputExpression_score" typeRef="integer">
+          <text>scoreCredit</text>
+        </inputExpression>
+      </input>
+      <input id="Input_endettement" label="Taux d'endettement (%)">
+        <inputExpression id="InputExpression_endettement" typeRef="double">
+          <text>tauxEndettement</text>
+        </inputExpression>
+      </input>
+      <!-- Loan-to-value : part du bien financee par le pret. Calculee ici en FEEL
+           a partir du montant demande et de la valeur retenue par l'expert. -->
+      <input id="Input_ltv" label="Montant / valeur expertisée (%)">
+        <inputExpression id="InputExpression_ltv" typeRef="double">
+          <text>montantDemande / valeurExpertisee * 100</text>
+        </inputExpression>
+      </input>
+
+      <output id="Output_risque" label="Niveau de risque" name="niveauRisque" typeRef="string" />
+
+      <rule id="Rule_incident">
+        <description>Inscrit au fichier des incidents : refus automatique</description>
+        <inputEntry id="r1_incident"><text>true</text></inputEntry>
+        <inputEntry id="r1_score"><text></text></inputEntry>
+        <inputEntry id="r1_endettement"><text></text></inputEntry>
+        <inputEntry id="r1_ltv"><text></text></inputEntry>
+        <outputEntry id="r1_out"><text>"refus"</text></outputEntry>
+      </rule>
+      <rule id="Rule_score_faible">
+        <inputEntry id="r2_incident"><text></text></inputEntry>
+        <inputEntry id="r2_score"><text>&lt; 500</text></inputEntry>
+        <inputEntry id="r2_endettement"><text></text></inputEntry>
+        <inputEntry id="r2_ltv"><text></text></inputEntry>
+        <outputEntry id="r2_out"><text>"refus"</text></outputEntry>
+      </rule>
+      <rule id="Rule_surendettement">
+        <description>Au-delà de 40 % d'endettement : aucune dérogation possible</description>
+        <inputEntry id="r3_incident"><text></text></inputEntry>
+        <inputEntry id="r3_score"><text></text></inputEntry>
+        <inputEntry id="r3_endettement"><text>&gt; 40</text></inputEntry>
+        <inputEntry id="r3_ltv"><text></text></inputEntry>
+        <outputEntry id="r3_out"><text>"refus"</text></outputEntry>
+      </rule>
+      <rule id="Rule_ltv_excessif">
+        <inputEntry id="r4_incident"><text></text></inputEntry>
+        <inputEntry id="r4_score"><text></text></inputEntry>
+        <inputEntry id="r4_endettement"><text></text></inputEntry>
+        <inputEntry id="r4_ltv"><text>&gt; 120</text></inputEntry>
+        <outputEntry id="r4_out"><text>"refus"</text></outputEntry>
+      </rule>
+      <rule id="Rule_hcsf">
+        <description>Entre 35 et 40 % : dérogation HCSF, décision du comité</description>
+        <inputEntry id="r5_incident"><text></text></inputEntry>
+        <inputEntry id="r5_score"><text></text></inputEntry>
+        <inputEntry id="r5_endettement"><text>&gt; 35</text></inputEntry>
+        <inputEntry id="r5_ltv"><text></text></inputEntry>
+        <outputEntry id="r5_out"><text>"eleve"</text></outputEntry>
+      </rule>
+      <rule id="Rule_ltv_eleve">
+        <description>Prêt supérieur à la valeur du bien</description>
+        <inputEntry id="r6_incident"><text></text></inputEntry>
+        <inputEntry id="r6_score"><text></text></inputEntry>
+        <inputEntry id="r6_endettement"><text></text></inputEntry>
+        <inputEntry id="r6_ltv"><text>&gt; 100</text></inputEntry>
+        <outputEntry id="r6_out"><text>"eleve"</text></outputEntry>
+      </rule>
+      <rule id="Rule_score_moyen">
+        <inputEntry id="r7_incident"><text></text></inputEntry>
+        <inputEntry id="r7_score"><text>&lt; 700</text></inputEntry>
+        <inputEntry id="r7_endettement"><text></text></inputEntry>
+        <inputEntry id="r7_ltv"><text></text></inputEntry>
+        <outputEntry id="r7_out"><text>"eleve"</text></outputEntry>
+      </rule>
+      <rule id="Rule_standard">
+        <inputEntry id="r8_incident"><text></text></inputEntry>
+        <inputEntry id="r8_score"><text></text></inputEntry>
+        <inputEntry id="r8_endettement"><text></text></inputEntry>
+        <inputEntry id="r8_ltv"><text></text></inputEntry>
+        <outputEntry id="r8_out"><text>"standard"</text></outputEntry>
+      </rule>
+
+    </decisionTable>
+  </decision>
+
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram>
+      <dmndi:DMNShape dmnElementRef="risquePret">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

@@ -48,4 +48,5 @@ springdoc:
 logging:
   level:
     com.formation.livraison: DEBUG
+    com.formation.pret: DEBUG
     org.camunda.bpm.engine.jobexecutor: WARN

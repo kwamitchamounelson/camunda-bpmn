@@ -19,6 +19,11 @@
       <groupId>com.formation.livraison</groupId>
       <artifactId>livraison-domain</artifactId>
     </dependency>
+    <!-- Second processus (pret hypothecaire) heberge par le meme moteur -->
+    <dependency>
+      <groupId>com.formation.livraison</groupId>
+      <artifactId>pret-process</artifactId>
+    </dependency>
 
     <!-- Moteur + Cockpit/Tasklist/Admin (inclut le starter de base) -->
     <dependency>

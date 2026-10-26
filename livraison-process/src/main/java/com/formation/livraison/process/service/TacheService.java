@@ -53,7 +53,11 @@ public class TacheService {
                             + "le moteur rejette cette requete. Utilisez l'un ou l'autre.");
         }
 
-        TaskQuery query = taskService.createTaskQuery().orderByTaskCreateTime().asc();
+        // Le moteur heberge aussi le processus de pret : sans ce filtre, ses taches
+        // apparaitraient ici avec un id de demande a la place d'un id de commande.
+        TaskQuery query = taskService.createTaskQuery()
+                .processDefinitionKey(ProcessVariables.PROCESS_KEY)
+                .orderByTaskCreateTime().asc();
         if (groupeFiltre != null) {
             // Une requete par groupe candidat ignore par defaut les taches deja attribuees.
             // includeAssignedTasks() rend la file complete, attribuee ou non.
@@ -70,7 +74,10 @@ public class TacheService {
     }
 
     public Task getObligatoire(String taskId) {
-        Task tache = taskService.createTaskQuery().taskId(taskId).singleResult();
+        Task tache = taskService.createTaskQuery()
+                .taskId(taskId)
+                .processDefinitionKey(ProcessVariables.PROCESS_KEY)
+                .singleResult();
         if (tache == null) {
             throw new IllegalArgumentException("Tache introuvable ou deja terminee : " + taskId);
         }

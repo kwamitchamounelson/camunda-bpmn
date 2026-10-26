@@ -680,6 +680,215 @@ select:focus {
   width: 80px;
 }
 
+/* ---------- Pret immobilier ---------- */
+
+.sous-navigation {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  align-self: flex-start;
+  background: var(--carte);
+  border: 1px solid var(--bord);
+  border-radius: 999px;
+}
+
+.sous-navigation__bouton {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 15px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--texte-doux);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sous-navigation__bouton:hover {
+  color: var(--texte);
+}
+
+.sous-navigation__bouton--actif {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sous-navigation__bouton--actif:hover {
+  color: #fff;
+}
+
+.sous-navigation__compte {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.scenarios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.scenario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  background: var(--carte);
+  color: var(--texte);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.scenario:hover {
+  border-color: #c7d0fb;
+  background: #fafbff;
+}
+
+.scenario--actif {
+  border-color: var(--accent);
+  background: var(--accent-clair);
+}
+
+.scenario__icone {
+  font-size: 20px;
+}
+
+.scenario__effet {
+  font-size: 12.5px;
+  color: var(--texte-doux);
+}
+
+.formulaire__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.commande__sous-titre--brut,
+.tache__sous-titre--brut {
+  text-transform: none;
+}
+
+.timers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px dashed #c7d0fb;
+  border-radius: 10px;
+  background: var(--accent-clair);
+}
+
+.timer__icone {
+  font-size: 20px;
+}
+
+.timer__texte {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  font-size: 13px;
+  color: var(--texte-doux);
+}
+
+.timer__texte strong {
+  color: var(--texte);
+}
+
+.variables {
+  margin-top: 18px;
+}
+
+.variables summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.variables .tableau {
+  margin-top: 8px;
+  font-size: 13.5px;
+}
+
+.variables .tableau td {
+  padding: 7px 10px;
+}
+
+.variables code {
+  font-size: 12px;
+  color: var(--texte-doux);
+}
+
+.indicateurs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.indicateurs div {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--fond);
+}
+
+.indicateurs span {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--texte-doux);
+}
+
+.indicateurs strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.tache__champs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.tache__champs input {
+  width: 100%;
+}
+
+.tache__alerte {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--alerte-clair);
+  color: var(--alerte);
+  font-size: 13px;
+}
+
+.tache__offre {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.tache__actions .tache__taux {
+  flex: 0 0 70px;
+  width: 70px;
+}
+
 /* ---------- Journal REST ---------- */
 
 .journal {

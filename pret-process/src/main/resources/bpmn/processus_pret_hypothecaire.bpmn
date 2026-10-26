@@ -39,9 +39,11 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_Incomplet" name="non" sourceRef="Gw_Complet" targetRef="Task_Completer" />
 
-    <bpmn:userTask id="Task_Completer" name="Compléter le dossier" camunda:candidateGroups="conseiller">
+    <bpmn:userTask id="Task_Completer" name="Compléter le dossier" camunda:candidateGroups="conseillers">
       <bpmn:extensionElements>
         <camunda:formData>
+          <camunda:formField id="revenusMensuels" label="Revenus mensuels nets (€)" type="long" />
+          <camunda:formField id="valeurBien" label="Prix du bien (€)" type="long" />
           <camunda:formField id="commentaireCompletude" label="Pièces fournies / commentaire" type="string" />
         </camunda:formData>
       </bpmn:extensionElements>
@@ -55,7 +57,13 @@
     </bpmn:boundaryEvent>
     <bpmn:sequenceFlow id="Flow_SansSuite" sourceRef="Boundary_DelaiPieces" targetRef="End_SansSuite" />
 
-    <bpmn:endEvent id="End_SansSuite" name="Dossier classé sans suite" />
+    <!-- Les fins sans tache de service posent leur statut via un listener -->
+    <bpmn:endEvent id="End_SansSuite" name="Dossier classé sans suite">
+      <bpmn:extensionElements>
+        <camunda:executionListener event="start"
+                                   expression="${demandePretService.cloturer(execution.processBusinessKey, 'CLASSEE_SANS_SUITE')}" />
+      </bpmn:extensionElements>
+    </bpmn:endEvent>
 
     <!-- ===== Analyses en parallèle ===== -->
 
@@ -70,7 +78,7 @@
     <bpmn:serviceTask id="Task_Endettement" name="Calculer le taux d'endettement" camunda:delegateExpression="#{calculerEndettement}" />
     <bpmn:sequenceFlow id="Flow_J2" sourceRef="Task_Endettement" targetRef="Gw_Join" />
 
-    <bpmn:userTask id="Task_Expertise" name="Expertiser le bien immobilier" camunda:candidateGroups="expert-immobilier">
+    <bpmn:userTask id="Task_Expertise" name="Expertiser le bien immobilier" camunda:candidateGroups="experts">
       <bpmn:extensionElements>
         <camunda:formData>
           <camunda:formField id="valeurExpertisee" label="Valeur expertisée (€)" type="long" />
@@ -100,7 +108,7 @@
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${niveauRisque == "refus"}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
 
-    <bpmn:userTask id="Task_Analyse" name="Analyser le dossier" camunda:candidateGroups="analyste-credit">
+    <bpmn:userTask id="Task_Analyse" name="Analyser le dossier" camunda:candidateGroups="analystes">
       <bpmn:extensionElements>
         <camunda:formData>
           <camunda:formField id="pretAccorde" label="Accorder le prêt ?" type="boolean" defaultValue="true" />
@@ -111,7 +119,7 @@
     </bpmn:userTask>
     <bpmn:sequenceFlow id="Flow_07" sourceRef="Task_Analyse" targetRef="Gw_Accorde" />
 
-    <bpmn:userTask id="Task_Comite" name="Statuer en comité de crédit" camunda:candidateGroups="comite-credit">
+    <bpmn:userTask id="Task_Comite" name="Statuer en comité de crédit" camunda:candidateGroups="comiteCredit">
       <bpmn:extensionElements>
         <camunda:formData>
           <camunda:formField id="pretAccorde" label="Accorder le prêt ?" type="boolean" defaultValue="false" />
@@ -145,7 +153,7 @@
     </bpmn:intermediateCatchEvent>
     <bpmn:sequenceFlow id="Flow_11" sourceRef="Timer_Reflexion" targetRef="Task_Acceptation" />
 
-    <bpmn:userTask id="Task_Acceptation" name="Recueillir l'acceptation de l'offre" camunda:candidateGroups="conseiller">
+    <bpmn:userTask id="Task_Acceptation" name="Recueillir l'acceptation de l'offre" camunda:candidateGroups="conseillers">
       <bpmn:extensionElements>
         <camunda:formData>
           <camunda:formField id="offreAcceptee" label="Offre acceptée par le client ?" type="boolean" defaultValue="true" />
@@ -161,7 +169,12 @@
     </bpmn:boundaryEvent>
     <bpmn:sequenceFlow id="Flow_Expiration" sourceRef="Boundary_ValiditeOffre" targetRef="End_Expiree" />
 
-    <bpmn:endEvent id="End_Expiree" name="Offre expirée" />
+    <bpmn:endEvent id="End_Expiree" name="Offre expirée">
+      <bpmn:extensionElements>
+        <camunda:executionListener event="start"
+                                   expression="${demandePretService.cloturer(execution.processBusinessKey, 'OFFRE_EXPIREE')}" />
+      </bpmn:extensionElements>
+    </bpmn:endEvent>
 
     <bpmn:exclusiveGateway id="Gw_Acceptee" name="Offre acceptée ?" default="Flow_Declinee" />
     <bpmn:sequenceFlow id="Flow_Acceptee" name="oui" sourceRef="Gw_Acceptee" targetRef="Task_Signature">
@@ -169,11 +182,16 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_Declinee" name="non" sourceRef="Gw_Acceptee" targetRef="End_Declinee" />
 
-    <bpmn:endEvent id="End_Declinee" name="Offre déclinée" />
+    <bpmn:endEvent id="End_Declinee" name="Offre déclinée">
+      <bpmn:extensionElements>
+        <camunda:executionListener event="start"
+                                   expression="${demandePretService.cloturer(execution.processBusinessKey, 'OFFRE_DECLINEE')}" />
+      </bpmn:extensionElements>
+    </bpmn:endEvent>
 
     <!-- ===== Signature et mise en place ===== -->
 
-    <bpmn:userTask id="Task_Signature" name="Signer l'acte authentique" camunda:candidateGroups="notaire">
+    <bpmn:userTask id="Task_Signature" name="Signer l'acte authentique" camunda:candidateGroups="notaires">
       <bpmn:extensionElements>
         <camunda:formData>
           <camunda:formField id="dateSignature" label="Date de signature" type="date" />

@@ -20,10 +20,12 @@ public class OpenApiConfig {
     public OpenAPI livraisonOpenApi() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("API Livraison")
+                        .title("API Livraison & Pret")
                         .version("1.0.0")
                         .description("""
-                                API metier du processus de livraison Camunda 7.
+                                API metier des processus Camunda 7 heberges par ce moteur :
+                                livraison (`/api/commandes`, `/api/taches`, `/api/stocks`) et
+                                pret hypothecaire (`/api/prets`, `/api/prets/taches`).
 
                                 Creer une commande demarre une instance du processus `processus_livraison`
                                 dont la businessKey est l'id de commande : l'instance est donc retrouvable

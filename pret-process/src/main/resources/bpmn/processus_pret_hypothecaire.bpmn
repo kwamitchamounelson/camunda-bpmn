@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_Pret" targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Camunda Modeler" exporterVersion="5.31.0"
+                  modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.22.0">
+  <bpmn:process id="ProcessusPretHypothecaire" name="Octroi de prêt hypothécaire" isExecutable="true" camunda:historyTimeToLive="P180D">
+
+    <!-- ===== Réception et complétude du dossier ===== -->
+
+    <bpmn:startEvent id="StartEvent_Pret" name="Demande de prêt reçue">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="emprunteur" label="Nom de l'emprunteur" type="string" />
+          <camunda:formField id="montantDemande" label="Montant demandé (€)" type="long" />
+          <camunda:formField id="dureeMois" label="Durée (mois)" type="long" defaultValue="240" />
+          <camunda:formField id="revenusMensuels" label="Revenus mensuels nets (€)" type="long" />
+          <camunda:formField id="apport" label="Apport personnel (€)" type="long" defaultValue="0" />
+          <camunda:formField id="valeurBien" label="Prix du bien (€)" type="long" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_01" sourceRef="StartEvent_Pret" targetRef="Task_Enregistrer" />
+
+    <bpmn:serviceTask id="Task_Enregistrer" name="Enregistrer la demande" camunda:delegateExpression="#{enregistrerDemande}" />
+    <bpmn:sequenceFlow id="Flow_02" sourceRef="Task_Enregistrer" targetRef="Task_Completude" />
+
+    <bpmn:serviceTask id="Task_Completude" name="Vérifier la complétude du dossier" camunda:delegateExpression="#{verifierCompletude}" />
+    <bpmn:sequenceFlow id="Flow_03" sourceRef="Task_Completude" targetRef="Gw_Complet" />
+
+    <bpmn:exclusiveGateway id="Gw_Complet" name="Dossier complet ?" default="Flow_Incomplet" />
+    <bpmn:sequenceFlow id="Flow_Complet" name="oui" sourceRef="Gw_Complet" targetRef="Gw_Split">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${dossierComplet}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Incomplet" name="non" sourceRef="Gw_Complet" targetRef="Task_Completer" />
+
+    <bpmn:userTask id="Task_Completer" name="Compléter le dossier" camunda:candidateGroups="conseiller">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="commentaireCompletude" label="Pièces fournies / commentaire" type="string" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_04" sourceRef="Task_Completer" targetRef="Task_Completude" />
+
+    <bpmn:boundaryEvent id="Boundary_DelaiPieces" name="Sans réponse (15 j)" attachedToRef="Task_Completer">
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P15D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_SansSuite" sourceRef="Boundary_DelaiPieces" targetRef="End_SansSuite" />
+
+    <bpmn:endEvent id="End_SansSuite" name="Dossier classé sans suite" />
+
+    <!-- ===== Analyses en parallèle ===== -->
+
+    <bpmn:parallelGateway id="Gw_Split" />
+    <bpmn:sequenceFlow id="Flow_S1" sourceRef="Gw_Split" targetRef="Task_Score" />
+    <bpmn:sequenceFlow id="Flow_S2" sourceRef="Gw_Split" targetRef="Task_Endettement" />
+    <bpmn:sequenceFlow id="Flow_S3" sourceRef="Gw_Split" targetRef="Task_Expertise" />
+
+    <bpmn:serviceTask id="Task_Score" name="Consulter le fichier des incidents (score crédit)" camunda:delegateExpression="#{consulterScoreCredit}" />
+    <bpmn:sequenceFlow id="Flow_J1" sourceRef="Task_Score" targetRef="Gw_Join" />
+
+    <bpmn:serviceTask id="Task_Endettement" name="Calculer le taux d'endettement" camunda:delegateExpression="#{calculerEndettement}" />
+    <bpmn:sequenceFlow id="Flow_J2" sourceRef="Task_Endettement" targetRef="Gw_Join" />
+
+    <bpmn:userTask id="Task_Expertise" name="Expertiser le bien immobilier" camunda:candidateGroups="expert-immobilier">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="valeurExpertisee" label="Valeur expertisée (€)" type="long" />
+          <camunda:formField id="commentaireExpertise" label="Commentaire" type="string" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_J3" sourceRef="Task_Expertise" targetRef="Gw_Join" />
+
+    <bpmn:parallelGateway id="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_05" sourceRef="Gw_Join" targetRef="Task_Risque" />
+
+    <!-- ===== Évaluation du risque et décision ===== -->
+
+    <bpmn:businessRuleTask id="Task_Risque" name="Évaluer le niveau de risque"
+                           camunda:decisionRef="risquePret"
+                           camunda:mapDecisionResult="singleEntry"
+                           camunda:resultVariable="niveauRisque" />
+    <bpmn:sequenceFlow id="Flow_06" sourceRef="Task_Risque" targetRef="Gw_Risque" />
+
+    <bpmn:exclusiveGateway id="Gw_Risque" name="Niveau de risque ?" default="Flow_RisqueStandard" />
+    <bpmn:sequenceFlow id="Flow_RisqueStandard" name="standard" sourceRef="Gw_Risque" targetRef="Task_Analyse" />
+    <bpmn:sequenceFlow id="Flow_RisqueEleve" name="élevé" sourceRef="Gw_Risque" targetRef="Task_Comite">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${niveauRisque == "eleve"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RisqueRefus" name="rédhibitoire" sourceRef="Gw_Risque" targetRef="Task_NotifierRefus">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${niveauRisque == "refus"}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:userTask id="Task_Analyse" name="Analyser le dossier" camunda:candidateGroups="analyste-credit">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="pretAccorde" label="Accorder le prêt ?" type="boolean" defaultValue="true" />
+          <camunda:formField id="tauxPropose" label="Taux proposé (%)" type="string" />
+          <camunda:formField id="motifRefus" label="Motif (si refus)" type="string" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_07" sourceRef="Task_Analyse" targetRef="Gw_Accorde" />
+
+    <bpmn:userTask id="Task_Comite" name="Statuer en comité de crédit" camunda:candidateGroups="comite-credit">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="pretAccorde" label="Accorder le prêt ?" type="boolean" defaultValue="false" />
+          <camunda:formField id="tauxPropose" label="Taux proposé (%)" type="string" />
+          <camunda:formField id="motifRefus" label="Motif (si refus)" type="string" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_08" sourceRef="Task_Comite" targetRef="Gw_Accorde" />
+
+    <bpmn:exclusiveGateway id="Gw_Accorde" name="Prêt accordé ?" default="Flow_Refuse" />
+    <bpmn:sequenceFlow id="Flow_Accorde" name="oui" sourceRef="Gw_Accorde" targetRef="Task_Offre">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${pretAccorde}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Refuse" name="non" sourceRef="Gw_Accorde" targetRef="Task_NotifierRefus" />
+
+    <bpmn:serviceTask id="Task_NotifierRefus" name="Notifier le refus" camunda:delegateExpression="#{notifierRefus}" />
+    <bpmn:sequenceFlow id="Flow_09" sourceRef="Task_NotifierRefus" targetRef="End_Refuse" />
+
+    <bpmn:endEvent id="End_Refuse" name="Prêt refusé" />
+
+    <!-- ===== Offre, délai légal et acceptation ===== -->
+
+    <bpmn:serviceTask id="Task_Offre" name="Émettre l'offre de prêt" camunda:delegateExpression="#{emettreOffre}" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_Offre" targetRef="Timer_Reflexion" />
+
+    <bpmn:intermediateCatchEvent id="Timer_Reflexion" name="Délai de réflexion légal (10 j)">
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P10D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Timer_Reflexion" targetRef="Task_Acceptation" />
+
+    <bpmn:userTask id="Task_Acceptation" name="Recueillir l'acceptation de l'offre" camunda:candidateGroups="conseiller">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="offreAcceptee" label="Offre acceptée par le client ?" type="boolean" defaultValue="true" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Task_Acceptation" targetRef="Gw_Acceptee" />
+
+    <bpmn:boundaryEvent id="Boundary_ValiditeOffre" name="Offre expirée (30 j)" attachedToRef="Task_Acceptation">
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_Expiration" sourceRef="Boundary_ValiditeOffre" targetRef="End_Expiree" />
+
+    <bpmn:endEvent id="End_Expiree" name="Offre expirée" />
+
+    <bpmn:exclusiveGateway id="Gw_Acceptee" name="Offre acceptée ?" default="Flow_Declinee" />
+    <bpmn:sequenceFlow id="Flow_Acceptee" name="oui" sourceRef="Gw_Acceptee" targetRef="Task_Signature">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${offreAcceptee}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Declinee" name="non" sourceRef="Gw_Acceptee" targetRef="End_Declinee" />
+
+    <bpmn:endEvent id="End_Declinee" name="Offre déclinée" />
+
+    <!-- ===== Signature et mise en place ===== -->
+
+    <bpmn:userTask id="Task_Signature" name="Signer l'acte authentique" camunda:candidateGroups="notaire">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="dateSignature" label="Date de signature" type="date" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Task_Signature" targetRef="Task_Deblocage" />
+
+    <bpmn:serviceTask id="Task_Deblocage" name="Débloquer les fonds" camunda:delegateExpression="#{debloquerFonds}" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Task_Deblocage" targetRef="Task_Echeancier" />
+
+    <bpmn:serviceTask id="Task_Echeancier" name="Mettre en place l'échéancier" camunda:delegateExpression="#{mettreEnPlaceEcheancier}" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="Task_Echeancier" targetRef="End_Octroye" />
+
+    <bpmn:endEvent id="End_Octroye" name="Prêt octroyé" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Pret">
+    <bpmndi:BPMNPlane id="BPMNPlane_Pret" bpmnElement="ProcessusPretHypothecaire">
+
+      <!-- Formes -->
+      <bpmndi:BPMNShape id="StartEvent_Pret_di" bpmnElement="StartEvent_Pret">
+        <dc:Bounds x="152" y="282" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="130" y="325" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Enregistrer_di" bpmnElement="Task_Enregistrer">
+        <dc:Bounds x="240" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Completude_di" bpmnElement="Task_Completude">
+        <dc:Bounds x="390" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Complet_di" bpmnElement="Gw_Complet" isMarkerVisible="true">
+        <dc:Bounds x="545" y="275" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="527" y="245" width="86" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Completer_di" bpmnElement="Task_Completer">
+        <dc:Bounds x="520" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_DelaiPieces_di" bpmnElement="Boundary_DelaiPieces">
+        <dc:Bounds x="552" y="482" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="592" y="520" width="90" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_SansSuite_di" bpmnElement="End_SansSuite">
+        <dc:Bounds x="552" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="527" y="615" width="86" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gw_Split_di" bpmnElement="Gw_Split">
+        <dc:Bounds x="645" y="275" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Score_di" bpmnElement="Task_Score">
+        <dc:Bounds x="750" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Endettement_di" bpmnElement="Task_Endettement">
+        <dc:Bounds x="750" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Expertise_di" bpmnElement="Task_Expertise">
+        <dc:Bounds x="750" y="400" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Join_di" bpmnElement="Gw_Join">
+        <dc:Bounds x="905" y="275" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Risque_di" bpmnElement="Task_Risque">
+        <dc:Bounds x="1010" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Risque_di" bpmnElement="Gw_Risque" isMarkerVisible="true">
+        <dc:Bounds x="1165" y="275" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1085" y="245" width="90" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Analyse_di" bpmnElement="Task_Analyse">
+        <dc:Bounds x="1270" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Comite_di" bpmnElement="Task_Comite">
+        <dc:Bounds x="1270" y="400" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Accorde_di" bpmnElement="Gw_Accorde" isMarkerVisible="true">
+        <dc:Bounds x="1425" y="275" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1480" y="245" width="72" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifierRefus_di" bpmnElement="Task_NotifierRefus">
+        <dc:Bounds x="1400" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Refuse_di" bpmnElement="End_Refuse">
+        <dc:Bounds x="1552" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1541" y="185" width="58" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Offre_di" bpmnElement="Task_Offre">
+        <dc:Bounds x="1530" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_Reflexion_di" bpmnElement="Timer_Reflexion">
+        <dc:Bounds x="1682" y="282" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1655" y="325" width="90" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Acceptation_di" bpmnElement="Task_Acceptation">
+        <dc:Bounds x="1770" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_ValiditeOffre_di" bpmnElement="Boundary_ValiditeOffre">
+        <dc:Bounds x="1802" y="322" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1735" y="365" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Expiree_di" bpmnElement="End_Expiree">
+        <dc:Bounds x="1802" y="422" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1787" y="465" width="66" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Acceptee_di" bpmnElement="Gw_Acceptee" isMarkerVisible="true">
+        <dc:Bounds x="1925" y="275" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1909" y="245" width="82" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Declinee_di" bpmnElement="End_Declinee">
+        <dc:Bounds x="1932" y="422" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1914" y="465" width="72" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Signature_di" bpmnElement="Task_Signature">
+        <dc:Bounds x="2030" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Deblocage_di" bpmnElement="Task_Deblocage">
+        <dc:Bounds x="2180" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Echeancier_di" bpmnElement="Task_Echeancier">
+        <dc:Bounds x="2330" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Octroye_di" bpmnElement="End_Octroye">
+        <dc:Bounds x="2482" y="282" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2470" y="325" width="62" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Flux -->
+      <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
+        <di:waypoint x="188" y="300" /><di:waypoint x="240" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="340" y="300" /><di:waypoint x="390" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_03_di" bpmnElement="Flow_03">
+        <di:waypoint x="490" y="300" /><di:waypoint x="545" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Complet_di" bpmnElement="Flow_Complet">
+        <di:waypoint x="595" y="300" /><di:waypoint x="645" y="300" />
+        <bpmndi:BPMNLabel><dc:Bounds x="611" y="282" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Incomplet_di" bpmnElement="Flow_Incomplet">
+        <di:waypoint x="570" y="325" /><di:waypoint x="570" y="420" />
+        <bpmndi:BPMNLabel><dc:Bounds x="576" y="360" width="20" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_04_di" bpmnElement="Flow_04">
+        <di:waypoint x="520" y="460" /><di:waypoint x="440" y="460" /><di:waypoint x="440" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SansSuite_di" bpmnElement="Flow_SansSuite">
+        <di:waypoint x="570" y="518" /><di:waypoint x="570" y="572" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_S1_di" bpmnElement="Flow_S1">
+        <di:waypoint x="670" y="275" /><di:waypoint x="670" y="160" /><di:waypoint x="750" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S2_di" bpmnElement="Flow_S2">
+        <di:waypoint x="695" y="300" /><di:waypoint x="750" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S3_di" bpmnElement="Flow_S3">
+        <di:waypoint x="670" y="325" /><di:waypoint x="670" y="440" /><di:waypoint x="750" y="440" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_J1_di" bpmnElement="Flow_J1">
+        <di:waypoint x="850" y="160" /><di:waypoint x="930" y="160" /><di:waypoint x="930" y="275" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_J2_di" bpmnElement="Flow_J2">
+        <di:waypoint x="850" y="300" /><di:waypoint x="905" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_J3_di" bpmnElement="Flow_J3">
+        <di:waypoint x="850" y="440" /><di:waypoint x="930" y="440" /><di:waypoint x="930" y="325" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="955" y="300" /><di:waypoint x="1010" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06_di" bpmnElement="Flow_06">
+        <di:waypoint x="1110" y="300" /><di:waypoint x="1165" y="300" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_RisqueStandard_di" bpmnElement="Flow_RisqueStandard">
+        <di:waypoint x="1215" y="300" /><di:waypoint x="1270" y="300" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1220" y="282" width="45" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RisqueEleve_di" bpmnElement="Flow_RisqueEleve">
+        <di:waypoint x="1190" y="325" /><di:waypoint x="1190" y="440" /><di:waypoint x="1270" y="440" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1205" y="422" width="28" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RisqueRefus_di" bpmnElement="Flow_RisqueRefus">
+        <di:waypoint x="1190" y="275" /><di:waypoint x="1190" y="160" /><di:waypoint x="1400" y="160" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1260" y="142" width="58" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07_di" bpmnElement="Flow_07">
+        <di:waypoint x="1370" y="300" /><di:waypoint x="1425" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08_di" bpmnElement="Flow_08">
+        <di:waypoint x="1370" y="440" /><di:waypoint x="1450" y="440" /><di:waypoint x="1450" y="325" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Refuse_di" bpmnElement="Flow_Refuse">
+        <di:waypoint x="1450" y="275" /><di:waypoint x="1450" y="200" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1456" y="225" width="20" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Accorde_di" bpmnElement="Flow_Accorde">
+        <di:waypoint x="1475" y="300" /><di:waypoint x="1530" y="300" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1494" y="282" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_di" bpmnElement="Flow_09">
+        <di:waypoint x="1500" y="160" /><di:waypoint x="1552" y="160" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1630" y="300" /><di:waypoint x="1682" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1718" y="300" /><di:waypoint x="1770" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Expiration_di" bpmnElement="Flow_Expiration">
+        <di:waypoint x="1820" y="358" /><di:waypoint x="1820" y="422" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1870" y="300" /><di:waypoint x="1925" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Declinee_di" bpmnElement="Flow_Declinee">
+        <di:waypoint x="1950" y="325" /><di:waypoint x="1950" y="422" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1956" y="365" width="20" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Acceptee_di" bpmnElement="Flow_Acceptee">
+        <di:waypoint x="1975" y="300" /><di:waypoint x="2030" y="300" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1994" y="282" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="2130" y="300" /><di:waypoint x="2180" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="2280" y="300" /><di:waypoint x="2330" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="2430" y="300" /><di:waypoint x="2482" y="300" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
